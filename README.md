@@ -83,15 +83,35 @@ Kết quả nằm trong `reup-ra/<ten>/`:
 - `phu-de.ass`
 - file `.mp4` cuối
 
-**Chi phí.** Phân tích và dựng chạy trên máy nên không tốn credit. Chỉ các bước sau tốn credit:
+**Chi phí.** Phân tích, hiệu ứng và dựng chạy trên máy nên không tốn credit. Chỉ các bước sau tốn credit:
 
-- tải video
+- tải video, **chỉ khi bạn đưa link**. Không muốn tốn phí tải thì tự tải video về rồi đưa đường dẫn file: `reup chay ~/Downloads/mau.mp4 ...`
 - viết kịch bản (chat)
 - giọng đọc, khoảng 15 credit cho 1.000 ký tự
 - ảnh AI cho cảnh có người (`goc`) hoặc mọi cảnh (`ai`)
 - video AI, nếu thêm `--video-ai`
 
+Đưa file trên máy chỉ bỏ được phí tải. Viết kịch bản và giọng đọc (TTS) vẫn tính credit như thường.
+
 Lệnh `chay` luôn dừng lại báo ước tính trước khi đọc giọng, trừ khi bạn thêm `--dong-y`.
+
+## Hiệu ứng máy quay (tuỳ chọn, 0 credit)
+
+Dùng bộ [claude-video-effects](https://github.com/Vibha-Ramprakash/claude-video-effects) (MIT, Vibha Ramprakash). Bộ này nhận diện khuôn mặt bằng MediaPipe rồi phóng, đẩy hoặc rọi sáng theo khuôn mặt.
+
+```bash
+reup cai-hieu-ung                                  # một lần, ~1 phút, cài vào ~/.revidapi/hieu-ung
+reup chay <link|file.mp4> --hieu-ung auto --dong-y  # tự gắn lean-in / slow-push / spotlight cho cảnh có người
+reup dung reup-ra/du-an --dong-y --hieu-ung ke-hoach.json   # hoặc tự viết kế hoạch
+```
+
+`ke-hoach.json` có dạng `{"effects": [{"fx": "lean-in", "start": 0.1, "end": 2.9}]}`. Tên hiệu ứng và mốc thời gian đều được kiểm, tối đa 30 hiệu ứng. Hiệu ứng chạy trên lớp hình trước khi chèn phụ đề, nên chữ không bị phóng theo. Chế độ `auto` chỉ gắn vào cảnh có người. Cảnh không có mặt người thì bộ hiệu ứng không có gì để bám.
+
+![Trước/sau hiệu ứng](docs/hieu-ung.jpg)
+
+*Hai khung trái: đoạn có lean-in. Hai khung phải: đoạn có slow-push, khung cuối đã phóng gần. Phụ đề giữ nguyên cỡ.*
+
+Mã bộ hiệu ứng được ghim ở một commit cố định và kiểm lại mỗi lần chạy. Bộ đó tự nạp `scripts/fx_private.py` nếu có file này, nên reup từ chối chạy khi thấy file ấy. Máy không có `ffprobe` thì reup dùng một bản thay thế nhỏ đọc từ ffmpeg.
 
 ## Bảo mật
 

@@ -75,7 +75,7 @@ def tieng_vut(ra: Path) -> Path:
 
 
 def dung(hinh: list[Path], moc: list[dict], giong: Path, ass: Path, ra: Path, tam: Path,
-         nhac: Path | None = None) -> Path:
+         nhac: Path | None = None, loc_hinh=None) -> Path:
     tam.mkdir(parents=True, exist_ok=True)
     clips = []
     for i, (h, m) in enumerate(zip(hinh, moc)):
@@ -86,6 +86,8 @@ def dung(hinh: list[Path], moc: list[dict], giong: Path, ass: Path, ra: Path, ta
     hinh_noi = tam / "hinh.mp4"
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(ds), "-c", "copy",
                     str(hinh_noi)], check=True)
+    if loc_hinh:  # hiệu ứng chạy trên lớp hình, trước phụ đề, để chữ không bị phóng/che
+        hinh_noi = loc_hinh(hinh_noi)
     vut = tieng_vut(tam / "vut.wav")
     vao = ["-i", str(hinh_noi), "-i", str(giong), "-i", str(vut)]
     if nhac:

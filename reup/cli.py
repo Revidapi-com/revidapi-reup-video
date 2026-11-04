@@ -7,7 +7,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from . import api, dung, giong, kich_ban, phan_tich
+from . import api, dung, giong, hieu_ung, kich_ban, phan_tich
 from .an_toan import LoiAnToan, che, kiem_url_media, ten_an_toan, trong_thu_muc
 
 CREDIT_1K_KY_TU = 15  # giọng đọc, theo bảng giá công khai
@@ -34,14 +34,22 @@ def lay_mau(nguon: str, da: Path) -> Path:
         return dich
     kiem_url_media(nguon)
     dich = da / "mau.mp4"
-    _in("Đang tải video mẫu qua RevidAPI…")
+    _in("Đang tải video mẫu qua RevidAPI (lượt tải có tính credit; muốn khỏi tốn thì tự tải về rồi đưa đường dẫn file mp4)…")
     info = api.tai_video(nguon, dich)
     (da / "nguon.json").write_text(json.dumps({"link": nguon, **info}, ensure_ascii=False, indent=1))
     return dich
 
 
+LUU_Y_CREDIT = ("Lưu ý credit: đưa LINK thì tốn credit tải video; đưa FILE mp4 trên máy thì không tốn phí tải. "
+                "Cả hai cách đều tốn credit viết kịch bản và giọng đọc (TTS ~15 credit/1.000 ký tự); "
+                "ảnh/video AI chỉ tính khi có cảnh cần vẽ lại.")
+
+
 def chay(args) -> None:
     _, da = _chuan_bi(args)
+    _in(LUU_Y_CREDIT)
+    if args.hieu_ung and not hieu_ung.san_sang():
+        raise LoiAnToan("Chưa cài bộ hiệu ứng. Chạy: reup cai-hieu-ung (một lần, 0 credit)")
     mau = lay_mau(args.nguon, da)
     _in("Phân tích (trên máy, 0 credit)…")
     nhip = phan_tich.phan_tich(mau, da / "phan-tich", args.whisper)
@@ -119,7 +127,15 @@ def _dung(da: Path, args) -> None:
     if nhac and not nhac.is_file():
         raise LoiAnToan("Không thấy file nhạc")
     ra = da / f"{ten_an_toan(kb.get('tieu_de') or 'video')}.mp4"
-    dung.dung(hinh, moc, da / "giong" / "giong.wav", ass, ra, da / "tam", nhac)
+    loc = None
+    if args.hieu_ung:
+        if args.hieu_ung == "auto":
+            kh = hieu_ung.ke_hoach_tu_dong(moc, sorted(can_ai))
+        else:
+            kh = hieu_ung.doc_ke_hoach(Path(args.hieu_ung).expanduser(), moc[-1]["ket_thuc"])
+        _in(f"Hiệu ứng (trên máy, 0 credit): {len(kh['effects'])} — " + ", ".join(e["fx"] for e in kh["effects"]))
+        loc = lambda v: hieu_ung.ap_dung(v, kh, v.with_name("hinh-hieu-ung.mp4"))  # noqa: E731
+    dung.dung(hinh, moc, da / "giong" / "giong.wav", ass, ra, da / "tam", nhac, loc)
     _in("Xong:", ra, f"({moc[-1]['ket_thuc']:.1f}s)")
 
 
@@ -143,6 +159,7 @@ def main(argv=None) -> int:
     c.add_argument("--model-anh", default="gpt-image-2")
     c.add_argument("--model-video", default="veo3.1-lite")
     c.add_argument("--nhac", help="file nhạc nền bạn có quyền dùng")
+    c.add_argument("--hieu-ung", help="auto = hiệu ứng máy quay cho cảnh có người; hoặc file kế hoạch .json")
     c.add_argument("--dong-y", action="store_true", help="bỏ qua cổng duyệt, tiêu credit luôn")
 
     d = sub.add_parser("dung", help="dựng từ kich-ban.json đã duyệt")
@@ -150,7 +167,7 @@ def main(argv=None) -> int:
     for a, k in [("--giong", dict(type=int, default=9055)), ("--toc-do", dict(type=float, default=1.0)),
                  ("--hinh", dict(choices=["goc", "frame", "ai", "nen"], default="goc")),
                  ("--model-anh", dict(default="gpt-image-2")), ("--model-video", dict(default="veo3.1-lite")),
-                 ("--model", dict(default="gpt-5.5")), ("--nhac", {})]:
+                 ("--model", dict(default="gpt-5.5")), ("--nhac", {}), ("--hieu-ung", {})]:
         d.add_argument(a, **k)
     d.add_argument("--video-ai", action="store_true")
     d.add_argument("--dong-y", action="store_true", required=True)
@@ -160,6 +177,7 @@ def main(argv=None) -> int:
     p.add_argument("--ten", default="du-an")
     p.add_argument("--whisper", default="small")
 
+    sub.add_parser("cai-hieu-ung", help="cài bộ hiệu ứng mã nguồn mở (một lần, 0 credit)")
     sub.add_parser("giong-list", help="danh sách giọng")
     sub.add_parser("so-du", help="xem số dư credit")
 
@@ -174,13 +192,15 @@ def main(argv=None) -> int:
             _, da = _chuan_bi(args)
             _in(json.dumps(phan_tich.phan_tich(lay_mau(args.nguon, da), da / "phan-tich", args.whisper),
                            ensure_ascii=False, indent=1))
+        elif args.lenh == "cai-hieu-ung":
+            _in("Đã cài:", hieu_ung.cai())
         elif args.lenh == "giong-list":
             _in(json.dumps(api.danh_sach_giong(), ensure_ascii=False, indent=1)[:20000])
         elif args.lenh == "so-du":
             kq = api.so_du()
             _in(json.dumps({k: kq.get(k) for k in ("credits", "plan", "email") if isinstance(kq, dict)},
                            ensure_ascii=False))
-    except (LoiAnToan, api.LoiAPI, ValueError) as e:
+    except (LoiAnToan, api.LoiAPI, ValueError, RuntimeError) as e:
         _in("Lỗi:", e)
         return 1
     except KeyboardInterrupt:
