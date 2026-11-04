@@ -67,13 +67,12 @@ def co_nguoi(anh: Path) -> bool:
     return False
 
 
-def tong_quan(vid: Path, ra: Path, moi_giay: float = 1.0, cot: int = 8) -> Path:
-    """Toàn bộ video thành MỘT khung lưới (mỗi giây 1 ô) để nhìn phong cách cả bài."""
+def tong_quan(vid: Path, ra: Path, so_o: int = 12, cot: int = 4) -> Path:
+    """Toàn bộ video thành MỘT khung lưới ~12 ô rải đều, để nhìn phong cách cả bài."""
     D = thoi_luong(vid)
-    n = max(1, int(D * moi_giay))
-    hang = (n + cot - 1) // cot
+    hang = (so_o + cot - 1) // cot
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(vid), "-vf",
-                    f"fps={moi_giay},scale=160:-2,tile={cot}x{hang}:padding=4:margin=8:color=0x111111",
+                    f"fps={so_o / max(D, 0.1):.4f},scale=240:-2,tile={cot}x{hang}:padding=4:margin=8:color=0x111111",
                     "-frames:v", "1", str(ra)], check=True)
     return ra
 
