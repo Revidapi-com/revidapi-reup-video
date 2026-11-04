@@ -10,7 +10,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from .an_toan import API_BASE, LoiAnToan, che, doc_khoa, kiem_url_media, tai_file
+from .an_toan import API_BASE, HTTPS, LoiAnToan, che, doc_khoa, kiem_url_media, tai_file
 
 
 class LoiAPI(Exception):
@@ -28,7 +28,7 @@ def _goi(method: str, path: str, *, body: dict | None = None, query: dict | None
         "X-API-Key": doc_khoa(), "Content-Type": "application/json",
         "User-Agent": "revidapi-reup-video/1.0"})
     # Không theo chuyển hướng ra máy khác khi đang mang khoá
-    opener = urllib.request.build_opener(_KhongChuyenHuong)
+    opener = urllib.request.build_opener(HTTPS, _KhongChuyenHuong)
     try:
         with opener.open(req, timeout=timeout) as r:
             raw = r.read(20 * 1024 * 1024)

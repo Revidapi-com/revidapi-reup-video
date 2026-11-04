@@ -95,7 +95,18 @@ class _ChanChuyenHuong(urllib.request.HTTPRedirectHandler):
         return new
 
 
-_opener = urllib.request.build_opener(_ChanChuyenHuong)
+def _ssl():
+    """Python cài từ python.org trên macOS không có sẵn chứng chỉ: dùng certifi nếu có."""
+    import ssl
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
+HTTPS = urllib.request.HTTPSHandler(context=_ssl())
+_opener = urllib.request.build_opener(HTTPS, _ChanChuyenHuong)
 
 
 def tai_file(url: str, dich: Path, *, toi_da: int = MAX_TAI, timeout: int = 120) -> Path:
