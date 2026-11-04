@@ -10,9 +10,9 @@
 6. **Lồng giọng** bằng thư viện giọng RevidAPI. Mỗi đoạn đọc riêng, khoảng lặng được rút cho liền mạch, không chèn im lặng nhân tạo.
 7. **Dựng video dọc 1080x1920**: Ken Burns, phụ đề theo cụm, chữ lớn trên hình, tiếng vút khi chuyển cảnh, nhạc nền (tuỳ chọn).
 
-![Toàn bộ một video mẫu 68 giây, mỗi giây một ô](docs/toan-bo.jpg)
+![Toàn bộ một video mẫu 68 giây, 12 ô rải đều](docs/toan-bo.jpg)
 
-*Toàn bộ video mẫu cắt thành một khung (`phan-tich/toan-bo.jpg`, mỗi giây một ô). Nhìn một ảnh là thấy phong cách cả bài: bố cục, màu, chữ, nhịp cảnh.*
+*Toàn bộ video mẫu cắt thành một khung (`phan-tich/toan-bo.jpg`, 12 ô rải đều). Nhìn một ảnh là thấy phong cách cả bài: bố cục, màu, chữ, nhịp cảnh.*
 
 Mục đích là học **công thức** của video mẫu, không chép hình, nhạc hay câu chữ của người khác. Hãy tôn trọng bản quyền nội dung gốc.
 
