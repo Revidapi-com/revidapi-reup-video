@@ -11,7 +11,8 @@ from . import api, dung, giong, kich_ban, phan_tich
 from .an_toan import LoiAnToan, che, kiem_url_media, ten_an_toan, trong_thu_muc
 
 CREDIT_1K_KY_TU = 15  # giọng đọc, theo bảng giá công khai
-CREDIT_ANH = 12
+CREDIT_ANH = 18
+CREDIT_VIDEO = 23
 
 
 def _in(*a):
@@ -50,13 +51,31 @@ def chay(args) -> None:
     kb = kich_ban.viet(nhip, loi, args.yeu_cau or "", args.model, args.giay)
     (da / "kich-ban.json").write_text(json.dumps(kb, ensure_ascii=False, indent=1), encoding="utf-8")
     n = kich_ban.so_ky_tu(kb)
-    uoc = round(n / 1000 * CREDIT_1K_KY_TU + (len(kb["doan"]) * CREDIT_ANH if args.hinh == "ai" else 0))
-    _in(f"Kịch bản: {len(kb['doan'])} đoạn, {n} ký tự → ước tính ~{uoc} credit (giọng"
-        f"{' + ảnh AI' if args.hinh == 'ai' else ''}). Xem/sửa: {da / 'kich-ban.json'}")
+    so_ai = len(_canh_can_ai(da, kb, args.hinh))
+    uoc = round(n / 1000 * CREDIT_1K_KY_TU + so_ai * (CREDIT_ANH + (CREDIT_VIDEO if args.video_ai else 0)))
+    _in(f"Kịch bản: {len(kb['doan'])} đoạn, {n} ký tự; {so_ai} cảnh có người sẽ vẽ lại bằng AI"
+        f"{' + video AI' if args.video_ai else ''} → ước tính ~{uoc} credit "
+        f"(chưa gồm lượt tải và viết kịch bản đã chạy). Xem/sửa: {da / 'kich-ban.json'}")
     if not args.dong_y:
         _in("Dừng ở cổng duyệt. Sửa kịch bản nếu cần rồi chạy: reup dung", da, "--dong-y")
         return
     _dung(da, args)
+
+
+def _canh_goc(da: Path, kb: dict) -> list[int]:
+    """Đoạn kịch bản i ứng với cảnh gốc nào (chia theo tỉ lệ)."""
+    n = len(sorted((da / "phan-tich" / "frames").glob("c*.jpg"))) or 1
+    return [min(n - 1, i * n // len(kb["doan"])) for i in range(len(kb["doan"]))]
+
+
+def _canh_can_ai(da: Path, kb: dict, che_do: str) -> list[int]:
+    if che_do == "ai":
+        return list(range(len(kb["doan"])))
+    if che_do != "goc":
+        return []
+    nhip = json.loads((da / "phan-tich" / "nhip.json").read_text(encoding="utf-8"))
+    nguoi = set(nhip.get("canh_co_nguoi") or [])
+    return [i for i, j in enumerate(_canh_goc(da, kb)) if j in nguoi]
 
 
 def _dung(da: Path, args) -> None:
@@ -64,19 +83,37 @@ def _dung(da: Path, args) -> None:
     kb = kich_ban.lam_sach(kb)
     moc = giong.long_tieng(kb, args.giong, da / "giong", args.toc_do)
     frames = sorted((da / "phan-tich" / "frames").glob("c*.jpg"))
+    goc = _canh_goc(da, kb)
+    can_ai = set(_canh_can_ai(da, kb, args.hinh))
     hinh_dir = da / "hinh"
     hinh_dir.mkdir(exist_ok=True)
     hinh = []
     for i, d in enumerate(kb["doan"]):
         p = hinh_dir / f"h{i:02d}.png"
-        if args.hinh == "ai" and d.get("mo_ta_hinh"):
+        v = hinh_dir / f"v{i:02d}.mp4"
+        if i in can_ai:
+            if v.exists():
+                hinh.append(v); continue
             if not p.exists():
-                api.tao_anh(args.model_anh, d["mo_ta_hinh"] + ", vertical 9:16, cinematic, no text", p)
-        elif args.hinh == "frame" and frames:
-            p = frames[min(len(frames) - 1, i * len(frames) // len(kb["doan"]))]
+                if args.hinh == "goc" and frames:
+                    # Giữ phong cách gốc: AI tả frame gốc rồi vẽ cảnh mới cùng bố cục, người khác (không chép người thật)
+                    mo_ta = api.mo_ta_frame(args.model, frames[goc[i]])
+                    prompt = f"{mo_ta}. Scene content: {d.get('mo_ta_hinh', '')}. A different, fictional person. No text."
+                else:
+                    prompt = d.get("mo_ta_hinh") or d["loi"]
+                _, url = api.tao_anh(args.model_anh, prompt + ", vertical 9:16", p)
+                (hinh_dir / f"h{i:02d}.url").write_text(url)
+            if args.video_ai:
+                url = (hinh_dir / f"h{i:02d}.url").read_text().strip()
+                dai = moc[i]["ket_thuc"] - moc[i]["bat_dau"]
+                api.tao_video(args.model_video, "subtle natural motion, same style, " + (d.get("mo_ta_hinh") or ""),
+                              url, v, duration="8s" if dai > 6 else "5s")
+                hinh.append(v); continue
+            hinh.append(p)
+        elif args.hinh in ("goc", "frame") and frames:
+            hinh.append(frames[goc[i]])
         else:
-            dung.the_chu(d.get("chu_tren_hinh", ""), p)
-        hinh.append(p)
+            hinh.append(dung.the_chu(d.get("chu_tren_hinh", ""), p))
     ass = dung.phu_de(kb, moc, da / "phu-de.ass")
     nhac = Path(args.nhac).expanduser() if args.nhac else None
     if nhac and not nhac.is_file():
@@ -100,18 +137,22 @@ def main(argv=None) -> int:
     c.add_argument("--whisper", default="small")
     c.add_argument("--giong", type=int, default=9055, help="voice_id (reup giong-list)")
     c.add_argument("--toc-do", type=float, default=1.0)
-    c.add_argument("--hinh", choices=["frame", "ai", "nen"], default="frame",
-                   help="frame = hình cảnh từ video mẫu (0 credit), ai = ảnh AI mỗi đoạn, nen = nền màu")
+    c.add_argument("--hinh", choices=["goc", "frame", "ai", "nen"], default="goc",
+                   help="goc = theo phong cách video gốc: cảnh có người vẽ lại bằng AI, cảnh khác giữ frame (mặc định)")
+    c.add_argument("--video-ai", action="store_true", help="cảnh có người: biến ảnh AI thành video AI")
     c.add_argument("--model-anh", default="gpt-image-2")
+    c.add_argument("--model-video", default="veo3.1-lite")
     c.add_argument("--nhac", help="file nhạc nền bạn có quyền dùng")
     c.add_argument("--dong-y", action="store_true", help="bỏ qua cổng duyệt, tiêu credit luôn")
 
     d = sub.add_parser("dung", help="dựng từ kich-ban.json đã duyệt")
     d.add_argument("du_an", help="thư mục dự án")
     for a, k in [("--giong", dict(type=int, default=9055)), ("--toc-do", dict(type=float, default=1.0)),
-                 ("--hinh", dict(choices=["frame", "ai", "nen"], default="frame")),
-                 ("--model-anh", dict(default="gpt-image-2")), ("--nhac", {})]:
+                 ("--hinh", dict(choices=["goc", "frame", "ai", "nen"], default="goc")),
+                 ("--model-anh", dict(default="gpt-image-2")), ("--model-video", dict(default="veo3.1-lite")),
+                 ("--model", dict(default="gpt-5.5")), ("--nhac", {})]:
         d.add_argument(a, **k)
+    d.add_argument("--video-ai", action="store_true")
     d.add_argument("--dong-y", action="store_true", required=True)
 
     p = sub.add_parser("phan-tich", help="chỉ phân tích video (0 credit)")

@@ -51,6 +51,33 @@ def chup_frame(vid: Path, canh: list[list[float]], thu_muc: Path) -> list[Path]:
     return ps
 
 
+def co_nguoi(anh: Path) -> bool:
+    """Phát hiện người trong frame bằng OpenCV (trên máy, 0 credit): mặt chính diện, mặt nghiêng, nửa thân."""
+    import cv2
+    img = cv2.imread(str(anh))
+    if img is None:
+        return False
+    xam = cv2.equalizeHist(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
+    h = img.shape[0]
+    for ten, toi_thieu in (("haarcascade_frontalface_default.xml", h // 12), ("haarcascade_profileface.xml", h // 12),
+                           ("haarcascade_upperbody.xml", h // 5)):
+        bo = cv2.CascadeClassifier(cv2.data.haarcascades + ten)
+        if len(bo.detectMultiScale(xam, 1.1, 6, minSize=(toi_thieu, toi_thieu))):
+            return True
+    return False
+
+
+def tong_quan(vid: Path, ra: Path, moi_giay: float = 1.0, cot: int = 8) -> Path:
+    """Toàn bộ video thành MỘT khung lưới (mỗi giây 1 ô) để nhìn phong cách cả bài."""
+    D = thoi_luong(vid)
+    n = max(1, int(D * moi_giay))
+    hang = (n + cot - 1) // cot
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(vid), "-vf",
+                    f"fps={moi_giay},scale=160:-2,tile={cot}x{hang}:padding=4:margin=8:color=0x111111",
+                    "-frames:v", "1", str(ra)], check=True)
+    return ra
+
+
 def boc_loi(vid: Path, model: str = "small", ngon_ngu: str | None = None) -> tuple[list[dict], str]:
     from faster_whisper import WhisperModel  # nặng: chỉ nạp khi cần
     m = WhisperModel(model, compute_type="int8")
@@ -63,13 +90,16 @@ def phan_tich(vid: Path, ra: Path, whisper_model: str = "small") -> dict:
     ra.mkdir(parents=True, exist_ok=True)
     D = thoi_luong(vid)
     canh = cat_canh(vid)
-    chup_frame(vid, canh, ra / "frames")
+    frames = chup_frame(vid, canh, ra / "frames")
+    tong_quan(vid, ra / "toan-bo.jpg")
+    nguoi = [co_nguoi(f) for f in frames]
     words, lang = boc_loi(vid, whisper_model)
     lens = [b - a for a, b in canh] or [0]
     noi = sum(w["e"] - w["s"] for w in words)
     nhip = {"thoi_luong": round(D, 2), "so_canh": len(canh), "canh_tb_giay": round(sum(lens) / len(lens), 2),
             "tu_moi_giay": round(len(words) / D, 2) if D else 0, "ngon_ngu": lang,
             "ty_le_co_loi": round(noi / D, 2) if D else 0,
+            "canh_co_nguoi": [i for i, x in enumerate(nguoi) if x],
             "hook_3s": " ".join(w["w"] for w in words if w["s"] < 3)}
     (ra / "canh.json").write_text(json.dumps(canh))
     (ra / "loi.json").write_text(json.dumps(words, ensure_ascii=False))

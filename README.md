@@ -10,6 +10,10 @@
 6. **Lồng giọng** bằng thư viện giọng RevidAPI. Mỗi đoạn đọc riêng, khoảng lặng được rút cho liền mạch, không chèn im lặng nhân tạo.
 7. **Dựng video dọc 1080x1920**: Ken Burns, phụ đề theo cụm, chữ lớn trên hình, tiếng vút khi chuyển cảnh, nhạc nền (tuỳ chọn).
 
+![Toàn bộ một video mẫu 68 giây, mỗi giây một ô](docs/toan-bo.jpg)
+
+*Toàn bộ video mẫu cắt thành một khung (`phan-tich/toan-bo.jpg`, mỗi giây một ô). Nhìn một ảnh là thấy phong cách cả bài: bố cục, màu, chữ, nhịp cảnh.*
+
 Mục đích là học **công thức** của video mẫu, không chép hình, nhạc hay câu chữ của người khác. Hãy tôn trọng bản quyền nội dung gốc.
 
 ## Cài đặt
@@ -52,19 +56,28 @@ reup dung reup-ra/mau1 --dong-y --giong 9055 --hinh frame --nhac ~/nhac-cua-toi.
 reup phan-tich mau.mp4 --ten mau2
 ```
 
-Chọn hình với `--hinh`:
+Mặc định (`--hinh goc`) video mới **theo phong cách video gốc**:
 
-| Giá trị | Hình mỗi cảnh | Chi phí |
+- Mỗi đoạn kịch bản ứng với cảnh gốc theo đúng thứ tự.
+- Cảnh **có người** (OpenCV tìm mặt/nửa thân, chạy trên máy): AI tả lại frame gốc (bố cục, góc máy, ánh sáng, trang phục) rồi vẽ **ảnh AI cùng phong cách, người khác** — không sao chép người thật. Thêm `--video-ai` để biến ảnh đó thành video AI chuyển động.
+- Cảnh **không có người**: giữ frame gốc, nền mờ + phóng chậm.
+
+![Các cảnh được cắt ra](docs/canh.jpg)
+
+*Frame từng cảnh (`tong-quan.jpg`). Video mẫu này là đồ hoạ, không có người, nên chế độ `goc` dùng lại frame và không tốn credit ảnh.*
+
+| `--hinh` | Hình mỗi cảnh | Chi phí |
 |---|---|---|
-| `frame` | frame cảnh tương ứng của video mẫu (nền mờ + phóng chậm) | 0 |
-| `ai` | ảnh AI vẽ theo `mo_ta_hinh` của từng đoạn | theo bảng giá ảnh |
-| `nen` | nền màu, chữ do phụ đề hiển thị | 0 |
+| `goc` (mặc định) | cảnh có người → ảnh AI cùng phong cách; còn lại → frame gốc | ảnh AI × số cảnh có người (+ video AI nếu `--video-ai`) |
+| `frame` | frame gốc cho mọi cảnh | 0 |
+| `ai` | ảnh AI cho mọi cảnh theo `mo_ta_hinh` | ảnh AI × số đoạn |
+| `nen` | nền màu, chữ do phụ đề | 0 |
 
 Nếu video mẫu đã có sẵn chữ trên hình, nên dùng `ai` hoặc `nen` để chữ không đè lên nhau.
 
 Kết quả nằm trong `reup-ra/<ten>/`:
 
-- `phan-tich/` (nhip.json, canh.json, loi.json, frames/, tong-quan.jpg)
+- `phan-tich/` (nhip.json, canh.json, loi.json, frames/, tong-quan.jpg, toan-bo.jpg)
 - `kich-ban.json`
 - `giong/`
 - `phu-de.ass`
@@ -75,7 +88,8 @@ Kết quả nằm trong `reup-ra/<ten>/`:
 - tải video
 - viết kịch bản (chat)
 - giọng đọc, khoảng 15 credit cho 1.000 ký tự
-- ảnh AI, nếu chọn `--hinh ai`
+- ảnh AI cho cảnh có người (`goc`) hoặc mọi cảnh (`ai`)
+- video AI, nếu thêm `--video-ai`
 
 Lệnh `chay` luôn dừng lại báo ước tính trước khi đọc giọng, trừ khi bạn thêm `--dong-y`.
 

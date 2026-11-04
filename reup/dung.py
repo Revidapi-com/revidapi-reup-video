@@ -44,6 +44,11 @@ def phu_de(kb: dict, moc: list[dict], ra: Path) -> Path:
 
 def _canh(hinh: Path, dai: float, ra: Path, i: int) -> Path:
     n = max(1, round(dai * FPS))
+    if hinh.suffix.lower() in (".mp4", ".mov", ".webm"):  # clip video AI: lặp/cắt cho vừa cảnh
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-stream_loop", "-1", "-i", str(hinh), "-an", "-vf",
+                        f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},fps={FPS},format=yuv420p",
+                        "-frames:v", str(n), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", str(ra)], check=True)
+        return ra
     huong = ["zoom+0.0006", "if(eq(on,0),1.06,zoom-0.0006)"][i % 2]
     vf = (f"[0:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},boxblur=30:2,eq=brightness=-0.15[nen];"
           f"[0:v]scale={W}:-2:force_original_aspect_ratio=decrease[tren];"

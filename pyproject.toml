@@ -3,7 +3,7 @@ name = "revidapi-reup-video"
 version = "0.1.0"
 description = "Tải video mẫu, phân tích cảnh/lời, viết lại bằng AI, lồng giọng và dựng video dọc mới qua RevidAPI"
 requires-python = ">=3.10"
-dependencies = ["faster-whisper>=1.0"]
+dependencies = ["faster-whisper>=1.0", "opencv-python-headless>=4.8"]
 license = {text = "MIT"}
 
 [project.scripts]
